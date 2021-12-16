@@ -19,6 +19,8 @@
 #import <CoreData/CoreData.h>
 #import "MJFrenchUser.h"
 #import "MJCat.h"
+#import <MJExtensionTests-Swift.h>
+#import "MJPerson.h"
 
 @interface MJExtensionTests : XCTestCase
 
@@ -380,28 +382,6 @@
     MJExtensionLog(@"%@", dictArray);
 }
 
-#pragma mark CoreData示例
-- (void)testCoreData {
-    NSDictionary *dict = @{
-                           @"name" : @"Jack",
-                           @"icon" : @"lufy.png",
-                           @"age" : @20,
-                           @"height" : @1.55,
-                           @"money" : @"100.9",
-                           @"sex" : @(SexFemale),
-                           @"gay" : @"true"
-                           };
-    
-    // 这个Demo仅仅提供思路，具体的方法参数需要自己创建
-    NSManagedObjectContext *context = nil;
-    MJUser *user = [MJUser mj_objectWithKeyValues:dict context:context];
-    
-    // 利用CoreData保存模型
-    [context save:nil];
-    
-    MJExtensionLog(@"name=%@, icon=%@, age=%d, height=%@, money=%@, sex=%d, gay=%d", user.name, user.icon, user.age, user.height, user.money, user.sex, user.gay);
-}
-
 #pragma mark NSNull相关的测试
 - (void)testNull {
     NSNull *null = [NSNull null];
@@ -462,14 +442,57 @@
     MJBag *bag = [[MJBag alloc] init];
     bag.name = @"Red bag";
     bag.price = 200.8;
+    bag.isBig = YES;
+    bag.weight = 200;
     
     NSString *file = [NSTemporaryDirectory() stringByAppendingPathComponent:@"bag.data"];
+    
+    NSError *error = nil;
     // 归档
-    [NSKeyedArchiver archiveRootObject:bag toFile:file];
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:bag requiringSecureCoding:YES error:&error];
+    [data writeToFile:file atomically:true];
+
+    // 解档
+    NSData *readData = [NSFileManager.defaultManager contentsAtPath:file];
+    error = nil;
+    MJBag *decodedBag = [NSKeyedUnarchiver unarchivedObjectOfClass:MJBag.class fromData:readData error:&error];
+    MJExtensionLog(@"name=%@, price=%f", decodedBag.name, decodedBag.price);
+}
+
+- (void)testCodingModelArrayProperty {
+    // 有 NSArray 属性 模型
+    MJPerson *person = [[MJPerson alloc] init];
+    person.name = @"boy1";
+    person.isVIP = YES;
+    
+    MJPerson *friend1 = [[MJPerson alloc] init];
+    friend1.name = @"friend1";
+    friend1.isVIP = YES;
+    
+    MJPerson *friend2 = [[MJPerson alloc] init];
+    friend2.name = @"friend2";
+    friend2.isVIP = NO;
+
+    person.friends = @[friend1, friend2];
+    person.books = @[@"book1", @"book2"];
+    
+    NSString *file = [NSTemporaryDirectory() stringByAppendingPathComponent:@"person.data"];
+    NSError *error = nil;
+    // 归档
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:person
+                                         requiringSecureCoding:YES
+                                                         error:&error];
+    BOOL write = [data writeToFile:file atomically:true];
+    XCTAssert(write);
     
     // 解档
-    MJBag *decodedBag = [NSKeyedUnarchiver unarchiveObjectWithFile:file];
-    MJExtensionLog(@"name=%@, price=%f", decodedBag.name, decodedBag.price);
+    NSData *readData = [NSFileManager.defaultManager contentsAtPath:file];
+    error = nil;
+    MJPerson *decodedPerson = [NSKeyedUnarchiver unarchivedObjectOfClass:MJPerson.class
+                                                                  fromData:readData
+                                                                     error:&error];
+    XCTAssert(decodedPerson.friends.count == 2);
+    XCTAssert(decodedPerson.books.count == 2);
 }
 
 #pragma mark  统一转换属性名（比如驼峰转下划线）
